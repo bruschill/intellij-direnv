@@ -69,6 +69,21 @@ tasks {
         gradleVersion = properties("gradleVersion").get()
     }
 
+    // Copy the built plugin distribution ZIP into the local 'dist' directory, overwriting existing files
+    val copyDistributionToDist by registering(Copy::class) {
+        dependsOn("buildPlugin")
+        from(layout.buildDirectory.dir("distributions"))
+        include("*.zip")
+        into(layout.projectDirectory.dir("dist"))
+        // Overwrite existing files in the destination if they exist
+        duplicatesStrategy = DuplicatesStrategy.INCLUDE
+    }
+
+    // Ensure the copy runs after building the plugin
+    named("buildPlugin") {
+        finalizedBy(copyDistributionToDist)
+    }
+
     patchPluginXml {
         version = properties("pluginVersion")
         sinceBuild = properties("pluginSinceBuild")
