@@ -24,6 +24,9 @@ repositories {
 // Dependencies are managed with Gradle version catalog - read more: https://docs.gradle.org/current/userguide/platforms.html#sub:version-catalog
 dependencies {
 //    implementation(libs.exampleLibrary)
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("io.mockk:mockk:1.13.12")
+    testImplementation("com.fasterxml.jackson.core:jackson-core:2.17.1")
 }
 
 // Set the JVM language level used to build the project.
@@ -59,6 +62,9 @@ kover {
 }
 
 tasks {
+    test {
+        useJUnitPlatform()
+    }
     wrapper {
         gradleVersion = properties("gradleVersion").get()
     }

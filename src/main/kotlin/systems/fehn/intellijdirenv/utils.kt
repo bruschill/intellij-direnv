@@ -14,4 +14,4 @@ fun <T : Any> T?.switchNull(
     }
 }
 
-val notificationGroup: NotificationGroup = NotificationGroupManager.getInstance().getNotificationGroup("Direnv")
+val notificationGroup: NotificationGroup by lazy { NotificationGroupManager.getInstance().getNotificationGroup("Direnv") }
