@@ -40,23 +40,49 @@ class DirenvProjectService(private val project: Project) {
     private val jsonFactory by lazy { JsonFactory() }
 
     fun importDirenv(envrcFile: VirtualFile, notifyNoChange: Boolean = true) {
+        val workingDir = envrcFile.parent.path
+        val appSettings = DirenvSettingsState.getInstance()
+        if (appSettings.direnvSettingsVerboseOutput) {
+            notificationGroup
+                .createNotification(
+                    "Running: direnv export json",
+                    "cwd: $workingDir",
+                    NotificationType.INFORMATION,
+                )
+                .notify(project)
+        }
+
         val process = executeDirenv(envrcFile, "export", "json")
 
-        if (process.waitFor() != 0) {
+        val exitCode = process.waitFor()
+        if (exitCode != 0) {
             handleDirenvError(process, envrcFile)
             return
         }
 
-        jsonFactory.createParser(process.inputStream).use { parser ->
+        // Read stdout fully so we can both show and parse it
+        val stdoutText = process.inputStream.bufferedReader().readText()
 
+        if (appSettings.direnvSettingsVerboseOutput) {
+            val preview = stdoutText.take(2000)
+            notificationGroup
+                .createNotification(
+                    "direnv output (truncated)",
+                    if (preview.isEmpty()) "<no output>" else preview,
+                    NotificationType.INFORMATION,
+                )
+                .notify(project)
+        }
+
+        jsonFactory.createParser(stdoutText.byteInputStream()).use { parser ->
             try {
-                val didWork = handleDirenvOutput(parser)
+                val count = handleDirenvOutput(parser)
 
-                if (didWork) {
+                if (count > 0) {
                     notificationGroup
                         .createNotification(
                             MyBundle.message("executedSuccessfully"),
-                            "",
+                            "Applied $count environment change(s).",
                             NotificationType.INFORMATION,
                         ).notify(project)
                 } else if (notifyNoChange) {
@@ -78,28 +104,38 @@ class DirenvProjectService(private val project: Project) {
         }
     }
 
-    private fun handleDirenvOutput(parser: JsonParser): Boolean {
-        var didWork = false
+    private fun handleDirenvOutput(parser: JsonParser): Int {
+        var count = 0
 
         while (parser.nextToken() != null) {
             if (parser.currentToken == JsonToken.FIELD_NAME) {
                 when (parser.nextToken()) {
                     JsonToken.VALUE_NULL -> envService.unsetVariable(parser.currentName)
                     JsonToken.VALUE_STRING -> envService.setVariable(parser.currentName, parser.valueAsString)
-
                     else -> continue
                 }
-
-                didWork = true
+                count++
                 logger.trace { "Set variable ${parser.currentName} to ${parser.valueAsString}" }
             }
         }
 
-        return didWork
+        return count
     }
 
     private fun handleDirenvError(process: Process, envrcFile: VirtualFile) {
         val error = process.errorStream.bufferedReader().readText()
+
+        val appSettings = DirenvSettingsState.getInstance()
+        if (appSettings.direnvSettingsVerboseOutput) {
+            val preview = error.take(2000)
+            notificationGroup
+                .createNotification(
+                    "direnv error output (truncated)",
+                    if (preview.isEmpty()) "<no stderr>" else preview,
+                    NotificationType.ERROR,
+                )
+                .notify(project)
+        }
 
         val notification = if (error.contains(" is blocked")) {
             notificationGroup

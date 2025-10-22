@@ -16,6 +16,7 @@ public class DirenvSettingsState implements PersistentStateComponent<DirenvSetti
     public String direnvSettingsPath = "";
     public Boolean direnvSettingsImportOnStartup = false;
     public Boolean direnvSettingsImportEveryExecution = false;
+    public Boolean direnvSettingsVerboseOutput = true;
 
     public static DirenvSettingsState getInstance() {
         return ApplicationManager.getApplication().getService(DirenvSettingsState.class);
